@@ -3,38 +3,58 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import { prisma } from './lib/prisma';
+import { logger } from './lib/logger';
+import { config, corsOptions, rateLimitOptions } from './lib/config';
+import { errorHandler, notFoundHandler } from './middleware/error-handler';
+import { gruposRoutes } from './routes/grupos.routes';
+
+/**
+ * KontaFlow API Server
+ *
+ * Sistema de contabilidad con partida doble
+ * Arquitectura por capas: Routes → Services → Repositories → Prisma
+ */
 
 const fastify = Fastify({
-  logger: {
-    transport: {
-      target: 'pino-pretty',
-      options: {
-        translateTime: 'HH:MM:ss Z',
-        ignore: 'pid,hostname',
-      },
-    },
-  },
+  logger: logger as any,
+  requestIdHeader: 'x-request-id',
+  trustProxy: true,
 });
 
-// Plugins
+// ===================================
+// PLUGINS
+// ===================================
 async function registerPlugins() {
   // CORS
-  await fastify.register(cors, {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-    credentials: true,
+  await fastify.register(cors, corsOptions);
+
+  // Helmet - Security headers
+  await fastify.register(helmet, {
+    contentSecurityPolicy: false, // Deshabilitado para desarrollo
   });
 
-  // Helmet (seguridad)
-  await fastify.register(helmet);
+  // Rate Limiting
+  await fastify.register(rateLimit, rateLimitOptions);
 
-  // Rate limiting
-  await fastify.register(rateLimit, {
-    max: 100,
-    timeWindow: '1 minute',
-  });
+  logger.info('✅ Plugins registered');
 }
 
-// Routes
+// ===================================
+// MIDDLEWARE
+// ===================================
+async function registerMiddleware() {
+  // Error handler global
+  fastify.setErrorHandler(errorHandler);
+
+  // 404 handler
+  fastify.setNotFoundHandler(notFoundHandler);
+
+  logger.info('✅ Middleware registered');
+}
+
+// ===================================
+// ROUTES
+// ===================================
 async function registerRoutes() {
   // Health check
   fastify.get('/health', async () => {
@@ -44,12 +64,14 @@ async function registerRoutes() {
         status: 'ok',
         timestamp: new Date().toISOString(),
         database: 'connected',
+        environment: config.NODE_ENV,
       };
     } catch (error) {
       return {
         status: 'error',
         timestamp: new Date().toISOString(),
         database: 'disconnected',
+        environment: config.NODE_ENV,
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
@@ -61,54 +83,104 @@ async function registerRoutes() {
       name: 'KontaFlow API',
       version: '1.0.0',
       status: 'running',
-      documentation: '/docs',
+      environment: config.NODE_ENV,
+      endpoints: {
+        health: '/health',
+        api: '/api',
+        docs: '/docs (próximamente)',
+      },
     };
   });
 
-  // API v1 routes prefix
-  fastify.register(
+  // API Routes (sin versionado por ahora, luego será /api/v1)
+  await fastify.register(
     async (instance) => {
-      // TODO: Registrar rutas de la API aquí
-      instance.get('/status', async () => {
-        return { message: 'API v1 ready' };
-      });
+      // Grupos Económicos
+      await instance.register(gruposRoutes, { prefix: '/grupos' });
+
+      // TODO: Más features
+      // await instance.register(empresasRoutes, { prefix: '/empresas' });
+      // await instance.register(cuentasRoutes, { prefix: '/cuentas' });
+      // await instance.register(asientosRoutes, { prefix: '/asientos' });
     },
-    { prefix: '/api/v1' }
+    { prefix: '/api' }
   );
+
+  logger.info('✅ Routes registered');
 }
 
-// Start server
+// ===================================
+// START SERVER
+// ===================================
 async function start() {
   try {
     await registerPlugins();
+    await registerMiddleware();
     await registerRoutes();
 
-    const port = parseInt(process.env.PORT || '8000', 10);
-    const host = process.env.HOST || '0.0.0.0';
+    await fastify.listen({
+      port: config.PORT,
+      host: config.HOST,
+    });
 
-    await fastify.listen({ port, host });
-
-    fastify.log.info(`Server listening on http://${host}:${port}`);
-    fastify.log.info(`Health check: http://${host}:${port}/health`);
+    logger.info('');
+    logger.info('🚀 KontaFlow API Server Started');
+    logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    logger.info(`📍 Server: http://${config.HOST}:${config.PORT}`);
+    logger.info(`🏥 Health: http://${config.HOST}:${config.PORT}/health`);
+    logger.info(`🔧 Environment: ${config.NODE_ENV}`);
+    logger.info(`🗄️  Database: Connected`);
+    logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    logger.info('');
+    logger.info('📋 Available Endpoints:');
+    logger.info('   GET  /api/grupos           - Listar grupos');
+    logger.info('   GET  /api/grupos/mis-grupos - Mis grupos');
+    logger.info('   GET  /api/grupos/:id        - Obtener grupo');
+    logger.info('   POST /api/grupos            - Crear grupo');
+    logger.info('   PUT  /api/grupos/:id        - Actualizar grupo');
+    logger.info('   DELETE /api/grupos/:id      - Eliminar grupo');
+    logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    logger.info('');
+    logger.info('💡 Tip: Use header "x-user-id: 1" para autenticación en desarrollo');
+    logger.info('');
   } catch (err) {
-    fastify.log.error(err);
+    console.error('❌ Error starting server:', err);
+    logger.error({ err }, '❌ Error starting server');
     process.exit(1);
   }
 }
 
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  fastify.log.info('SIGTERM received, closing server gracefully');
-  await fastify.close();
-  await prisma.$disconnect();
-  process.exit(0);
+// ===================================
+// GRACEFUL SHUTDOWN
+// ===================================
+const gracefulShutdown = async (signal: string) => {
+  logger.info(`${signal} received, closing server gracefully...`);
+
+  try {
+    await fastify.close();
+    await prisma.$disconnect();
+    logger.info('✅ Server closed successfully');
+    process.exit(0);
+  } catch (err) {
+    logger.error('❌ Error during shutdown:', err);
+    process.exit(1);
+  }
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Handle unhandled rejections
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
 });
 
-process.on('SIGINT', async () => {
-  fastify.log.info('SIGINT received, closing server gracefully');
-  await fastify.close();
-  await prisma.$disconnect();
-  process.exit(0);
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught Exception:', error);
+  process.exit(1);
 });
 
+// Start the server
 start();
