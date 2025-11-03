@@ -1632,80 +1632,251 @@ export default function ComprobantePage() {
 
 ## Fase 3.7: Internacionalización (i18n) (NUEVO)
 
-### 3.7.1. Idiomas Soportados
+### 3.7.1. Filosofía: Simplicidad sobre Complejidad
+
+KontaFlow usa un sistema de i18n **simple y directo** basado en React Context, sin dependencias externas pesadas.
+
+**Por qué NO usamos next-intl**:
+- ❌ Complejidad innecesaria para nuestras necesidades
+- ❌ Routing complicado con carpetas `[locale]`
+- ❌ Problemas de cache y middleware
+- ❌ Over-engineering para un problema simple
+
+**Por qué SÍ usamos Context + JSON**:
+- ✅ Simple: Solo archivos JSON + Context
+- ✅ Sin dependencias externas
+- ✅ Sin cambios en routing
+- ✅ localStorage para persistencia
+- ✅ Fácil de debuggear
+
+---
+
+### 3.7.2. Idiomas Soportados
 
 - 🇪🇸 Español (es) - Default
-- 🇧🇷 Português (pt-BR)
+- 🇧🇷 Português (pt)
 - 🇺🇸 English (en)
+- 🇫🇷 Français (fr)
+- 🇨🇳 中文 (zh)
 
-### 3.7.2. Setup con next-intl
+---
 
-**Instalar dependencia**:
-```bash
-cd frontend
-npm install next-intl
+### 3.7.3. Estructura de Archivos
+
 ```
-
-**Estructura de archivos**:
-```
-frontend/
-├── messages/
+frontend/src/
+├── messages/              # Archivos de traducciones
 │   ├── es.json
 │   ├── pt.json
-│   └── en.json
-├── middleware.ts
-├── i18n.ts
-└── app/
-    └── [locale]/
-        ├── layout.tsx
-        └── grupos/
-            └── page.tsx
+│   ├── en.json
+│   ├── fr.json
+│   └── zh.json
+├── i18n/
+│   ├── locale-names.json  # Mapeo código → nombre
+│   └── locales.ts         # Auto-descubrimiento de idiomas
+└── contexts/
+    └── I18nContext.tsx    # Context Provider + hook
 ```
 
 ---
 
-### 3.7.3. Configuración
+### 3.7.4. Sistema de Auto-Descubrimiento
 
-**Archivo**: `frontend/i18n.ts`
-```typescript
-import { getRequestConfig } from 'next-intl/server';
-import { notFound } from 'next/navigation';
+**IMPORTANTE**: Para agregar un nuevo idioma, solo necesitas 2 pasos:
 
-export const locales = ['es', 'pt', 'en'] as const;
-export const defaultLocale = 'es';
+#### Paso 1: Crear archivo JSON de mensajes
 
-export default getRequestConfig(async ({ locale }) => {
-  if (!locales.includes(locale as any)) notFound();
+**Archivo**: `frontend/src/messages/{codigo}.json`
 
-  return {
-    messages: (await import(`./messages/${locale}.json`)).default,
-  };
-});
-```
-
-**Archivo**: `frontend/middleware.ts`
-```typescript
-import createMiddleware from 'next-intl/middleware';
-import { locales, defaultLocale } from './i18n';
-
-export default createMiddleware({
-  locales,
-  defaultLocale,
-  localePrefix: 'always', // URLs: /es/grupos, /pt/grupos, /en/grupos
-});
-
-export const config = {
-  matcher: ['/', '/(es|pt|en)/:path*']
-};
-```
-
----
-
-### 3.7.4. Archivos de Mensajes
-
-**Archivo**: `frontend/messages/es.json`
 ```json
 {
+  "_locale": {
+    "name": "Nombre del Idioma"
+  },
+  "common": {
+    "create": "Traducción...",
+    "edit": "Traducción...",
+    ...
+  },
+  "grupos": {
+    "title": "Traducción...",
+    ...
+  }
+}
+```
+
+**Nota**: La propiedad `_locale.name` es opcional, si no existe se usa el código en mayúsculas.
+
+#### Paso 2: Registrar en locale-names.json
+
+**Archivo**: `frontend/src/i18n/locale-names.json`
+
+```json
+{
+  "es": "Español",
+  "pt": "Português",
+  "en": "English",
+  "fr": "Français",
+  "zh": "中文",
+  "it": "Italiano"  ← Agregar nueva entrada
+}
+```
+
+**¡Eso es todo!** El sistema automáticamente:
+- Carga el archivo de mensajes
+- Lo incluye en el selector de idiomas
+- Genera los tipos de TypeScript
+- Funciona en toda la aplicación
+
+**NO necesitas tocar ningún archivo de código TypeScript.**
+
+---
+
+### 3.7.5. Implementación del Sistema
+
+#### Archivo: `frontend/src/i18n/locales.ts`
+
+```typescript
+/**
+ * Sistema de auto-descubrimiento de idiomas
+ *
+ * Para agregar un nuevo idioma:
+ * 1. Crear archivo: src/messages/{codigo}.json
+ * 2. Agregar entrada en src/i18n/locale-names.json: "codigo": "Nombre"
+ *
+ * ¡Eso es todo! No necesitas tocar este archivo.
+ */
+
+import localeNames from './locale-names.json';
+
+// Cargar dinámicamente todos los archivos de mensajes basados en locale-names.json
+const loadMessages = () => {
+  const locales: Record<string, { name: string; messages: any }> = {};
+
+  Object.entries(localeNames).forEach(([code, name]) => {
+    try {
+      // Import dinámico del archivo de mensajes
+      const messages = require(`@/messages/${code}.json`);
+      locales[code] = { name, messages };
+    } catch (error) {
+      console.error(`Error cargando idioma ${code}:`, error);
+    }
+  });
+
+  return locales;
+};
+
+export const AVAILABLE_LOCALES = loadMessages();
+
+// Tipo base de mensajes (usar español como referencia)
+const esMessages = require('@/messages/es.json');
+export type Messages = typeof esMessages;
+
+// Tipo de locale inferido de locale-names.json
+export type Locale = keyof typeof localeNames;
+
+// Idioma por defecto
+export const DEFAULT_LOCALE: Locale = 'es';
+
+// Objeto de mensajes para el contexto
+export const messages: Record<Locale, Messages> = Object.fromEntries(
+  Object.entries(AVAILABLE_LOCALES).map(([code, config]) => [code, config.messages])
+) as Record<Locale, Messages>;
+
+// Lista de idiomas para el selector
+export const languages: Record<Locale, string> = localeNames;
+```
+
+#### Archivo: `frontend/src/contexts/I18nContext.tsx`
+
+```typescript
+'use client';
+
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { messages, DEFAULT_LOCALE, AVAILABLE_LOCALES, type Locale } from '@/i18n/locales';
+
+interface I18nContextType {
+  locale: Locale;
+  setLocale: (locale: Locale) => void;
+  t: (key: string) => string;
+}
+
+const I18nContext = createContext<I18nContextType | undefined>(undefined);
+
+export function I18nProvider({ children }: { children: ReactNode }) {
+  const [locale, setLocaleState] = useState<Locale>(DEFAULT_LOCALE);
+
+  // Cargar idioma guardado en localStorage al montar
+  useEffect(() => {
+    const savedLocale = localStorage.getItem('locale') as Locale;
+    if (savedLocale && savedLocale in AVAILABLE_LOCALES) {
+      setLocaleState(savedLocale);
+    }
+  }, []);
+
+  const setLocale = (newLocale: Locale) => {
+    setLocaleState(newLocale);
+    localStorage.setItem('locale', newLocale);
+  };
+
+  const t = (key: string): string => {
+    const keys = key.split('.');
+    let value: any = messages[locale];
+
+    for (const k of keys) {
+      value = value?.[k];
+    }
+
+    return value || key;
+  };
+
+  return (
+    <I18nContext.Provider value={{ locale, setLocale, t }}>
+      {children}
+    </I18nContext.Provider>
+  );
+}
+
+export function useTranslation() {
+  const context = useContext(I18nContext);
+  if (!context) {
+    throw new Error('useTranslation must be used within I18nProvider');
+  }
+  return context;
+}
+```
+
+#### Integrar Provider en Layout
+
+**Archivo**: `frontend/src/app/layout.tsx`
+
+```typescript
+import { I18nProvider } from '@/contexts/I18nContext';
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="es">
+      <body>
+        <I18nProvider>
+          {children}
+        </I18nProvider>
+      </body>
+    </html>
+  );
+}
+```
+
+---
+
+### 3.7.6. Estructura de Archivos de Mensajes
+
+**Organización por namespaces**:
+
+```json
+{
+  "_locale": {
+    "name": "Español"
+  },
   "common": {
     "create": "Crear",
     "edit": "Editar",
@@ -1714,243 +1885,161 @@ export const config = {
     "cancel": "Cancelar",
     "search": "Buscar",
     "active": "Activo",
-    "inactive": "Inactivo",
-    "loading": "Cargando...",
-    "noResults": "No hay resultados",
-    "confirmDelete": "¿Estás seguro de eliminar?"
+    "inactive": "Inactivo"
+  },
+  "navigation": {
+    "home": "Inicio",
+    "grupos": "Grupos Económicos",
+    "empresas": "Empresas",
+    "dashboard": "Tablero"
   },
   "grupos": {
     "title": "Grupos Económicos",
-    "description": "Gestiona tus grupos económicos y empresas",
     "createButton": "Crear Grupo",
-    "editTitle": "Editar Grupo",
-    "fields": {
-      "nombre": "Nombre",
-      "nombrePlaceholder": "Ej: Grupo Pragmatic",
-      "paisPrincipal": "País Principal",
-      "monedaBase": "Moneda Base"
+    "table": {
+      "name": "Nombre",
+      "country": "País",
+      "currency": "Moneda"
+    },
+    "form": {
+      "nameLabel": "Nombre del Grupo",
+      "namePlaceholder": "Ej: Grupo XYZ"
     },
     "messages": {
       "created": "Grupo económico creado correctamente",
-      "updated": "Grupo económico actualizado correctamente",
-      "deleted": "Grupo económico eliminado correctamente",
-      "loadError": "Error al cargar grupos"
-    },
-    "errors": {
-      "nombreRequired": "El nombre es requerido",
-      "nombreTooShort": "El nombre debe tener al menos 3 caracteres",
-      "nombreTooLong": "El nombre no puede exceder 200 caracteres",
-      "paisRequired": "Selecciona un país",
-      "monedaRequired": "Selecciona una moneda"
+      "updated": "Grupo económico actualizado correctamente"
     }
   }
 }
 ```
 
-**Archivo**: `frontend/messages/pt.json`
-```json
-{
-  "common": {
-    "create": "Criar",
-    "edit": "Editar",
-    "delete": "Excluir",
-    "save": "Salvar",
-    "cancel": "Cancelar",
-    "search": "Pesquisar",
-    "active": "Ativo",
-    "inactive": "Inativo",
-    "loading": "Carregando...",
-    "noResults": "Nenhum resultado encontrado",
-    "confirmDelete": "Tem certeza que deseja excluir?"
-  },
-  "grupos": {
-    "title": "Grupos Econômicos",
-    "description": "Gerencie seus grupos econômicos e empresas",
-    "createButton": "Criar Grupo",
-    "editTitle": "Editar Grupo",
-    "fields": {
-      "nombre": "Nome",
-      "nombrePlaceholder": "Ex: Grupo Pragmatic",
-      "paisPrincipal": "País Principal",
-      "monedaBase": "Moeda Base"
-    },
-    "messages": {
-      "created": "Grupo econômico criado com sucesso",
-      "updated": "Grupo econômico atualizado com sucesso",
-      "deleted": "Grupo econômico excluído com sucesso",
-      "loadError": "Erro ao carregar grupos"
-    }
-  }
-}
-```
-
-**Archivo**: `frontend/messages/en.json`
-```json
-{
-  "common": {
-    "create": "Create",
-    "edit": "Edit",
-    "delete": "Delete",
-    "save": "Save",
-    "cancel": "Cancel",
-    "search": "Search",
-    "active": "Active",
-    "inactive": "Inactive",
-    "loading": "Loading...",
-    "noResults": "No results found",
-    "confirmDelete": "Are you sure you want to delete?"
-  },
-  "grupos": {
-    "title": "Economic Groups",
-    "description": "Manage your economic groups and companies",
-    "createButton": "Create Group",
-    "editTitle": "Edit Group",
-    "fields": {
-      "nombre": "Name",
-      "nombrePlaceholder": "Ex: Pragmatic Group",
-      "paisPrincipal": "Main Country",
-      "monedaBase": "Base Currency"
-    },
-    "messages": {
-      "created": "Economic group created successfully",
-      "updated": "Economic group updated successfully",
-      "deleted": "Economic group deleted successfully",
-      "loadError": "Error loading groups"
-    }
-  }
-}
-```
+**Convenciones**:
+- Usar dot notation para jerarquías: `grupos.table.name`
+- Agrupar por feature/módulo: `grupos.*`, `empresas.*`
+- `common.*` para textos compartidos
+- `navigation.*` para menús
+- `validation.*` para mensajes de error genéricos
 
 ---
 
-### 3.7.5. Uso en Componentes
+### 3.7.7. Uso en Componentes
+
+**Hook principal**: `useTranslation()`
 
 ```tsx
 'use client';
 
-import { useTranslations } from 'next-intl';
-import { Plus, Search } from 'lucide-react';
+import { useTranslation } from '@/contexts/I18nContext';
+import { Plus } from 'lucide-react';
 
 export default function GruposPage() {
-  const t = useTranslations('grupos');
-  const tCommon = useTranslations('common');
+  const { t } = useTranslation();
 
   return (
-    <MainLayout>
-      <div className="container mx-auto py-6 px-6">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold">{t('title')}</h1>
-          <p className="text-sm text-gray-600">{t('description')}</p>
-        </div>
+    <div className="container mx-auto py-6 px-6">
+      {/* Títulos */}
+      <h1 className="text-2xl font-bold">{t('grupos.title')}</h1>
 
-        {/* Filtros */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between">
-            <Input
-              placeholder={`${tCommon('search')}...`}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <Button onClick={handleCreate}>
-              <Plus className="h-4 w-4 mr-2" />
-              {t('createButton')}
-            </Button>
-          </div>
-        </div>
+      {/* Botones */}
+      <Button onClick={handleCreate}>
+        <Plus className="h-4 w-4 mr-2" />
+        {t('grupos.createButton')}
+      </Button>
 
-        {/* Tabla */}
-        <DataTable items={grupos} />
+      {/* Inputs */}
+      <Input
+        placeholder={t('common.search')}
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+      />
 
-        {/* Mensajes de éxito/error */}
-        {success && toast.success(t('messages.created'))}
-        {error && toast.error(t('messages.loadError'))}
-      </div>
-    </MainLayout>
+      {/* Headers de tabla */}
+      <TableHead>{t('grupos.table.name')}</TableHead>
+      <TableHead>{t('grupos.table.country')}</TableHead>
+
+      {/* Mensajes de éxito/error */}
+      {success && toast.success(t('grupos.messages.created'))}
+    </div>
   );
 }
+```
+
+**Patrón de uso**:
+```typescript
+const { t, locale, setLocale } = useTranslation();
+
+// Traducir texto
+const title = t('grupos.title');
+
+// Obtener idioma actual
+console.log(locale); // 'es', 'pt', 'en', etc.
+
+// Cambiar idioma
+setLocale('pt');
 ```
 
 ---
 
-### 3.7.6. Selector de Idioma en Header
+### 3.7.8. Selector de Idioma en Header
 
-**Archivo**: `frontend/src/components/layout/language-selector.tsx`
+**Ya está implementado** en `frontend/src/components/layout/header.tsx`:
 
 ```tsx
 'use client';
 
-import { useLocale } from 'next-intl';
-import { usePathname, useRouter } from 'next/navigation';
-import { Languages } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { Building2, Menu, Languages } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useTranslation } from '@/contexts/I18nContext';
+import { languages, type Locale } from '@/i18n/locales';
 
-const languages = {
-  es: { label: 'Español', flag: '🇪🇸' },
-  pt: { label: 'Português', flag: '🇧🇷' },
-  en: { label: 'English', flag: '🇺🇸' },
-};
-
-export function LanguageSelector() {
-  const locale = useLocale();
-  const router = useRouter();
-  const pathname = usePathname();
-
-  const changeLanguage = (newLocale: string) => {
-    // Reemplazar locale en URL: /es/grupos → /pt/grupos
-    const newPath = pathname.replace(`/${locale}`, `/${newLocale}`);
-    router.push(newPath);
-  };
+export function Header({ onMenuClick }: { onMenuClick: () => void }) {
+  const { locale, setLocale } = useTranslation();
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm">
-          <Languages className="h-4 w-4 mr-2" />
-          {languages[locale as keyof typeof languages].flag}
-          <span className="ml-1">
-            {locale.toUpperCase()}
-          </span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        {Object.entries(languages).map(([code, { label, flag }]) => (
-          <DropdownMenuItem
-            key={code}
-            onClick={() => changeLanguage(code)}
-            className={locale === code ? 'bg-primary/10' : ''}
-          >
-            <span className="mr-2">{flag}</span>
-            {label}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-```
-
-**Integrar en Header**:
-```tsx
-import { LanguageSelector } from './language-selector';
-
-export function Header() {
-  return (
-    <header className="...">
-      <div className="flex h-16 items-center px-6">
+    <header className="sticky top-0 z-50 w-full border-b bg-white">
+      <div className="flex h-16 items-center gap-4 px-6">
         {/* Logo */}
-        <div className="flex items-center gap-3">...</div>
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <Building2 className="h-6 w-6" />
+          </div>
+          <h1 className="text-xl font-bold">KontaFlow</h1>
+        </div>
 
-        {/* Usuario y selector de idioma */}
-        <div className="ml-auto flex items-center gap-4">
-          <LanguageSelector />
-          <UserMenu />
+        <div className="flex-1" />
+
+        {/* Language selector */}
+        <div className="flex items-center gap-2">
+          <Languages className="h-4 w-4 text-gray-500" />
+          <Select
+            value={locale}
+            onValueChange={(value) => setLocale(value as Locale)}
+          >
+            <SelectTrigger className="w-[140px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(languages).map(([code, name]) => (
+                <SelectItem key={code} value={code}>
+                  {name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Usuario */}
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <p className="text-sm font-medium">Usuario Demo</p>
+          </div>
         </div>
       </div>
     </header>
@@ -1958,49 +2047,99 @@ export function Header() {
 }
 ```
 
+**Características**:
+- ✅ Dropdown con todos los idiomas disponibles (auto-descubiertos)
+- ✅ Icono de idiomas (lucide-react `Languages`)
+- ✅ Cambio instantáneo sin recargar página
+- ✅ Persiste en localStorage
+- ✅ Se actualiza toda la UI automáticamente
+
 ---
 
-### 3.7.7. Validaciones Traducidas
+### 3.7.9. Checklist de i18n por Feature
 
-Para mensajes de validación del backend, usar headers de Accept-Language:
+**Al implementar una nueva feature, seguir estos pasos**:
 
-**Frontend API Client**:
-```typescript
-private getHeaders(): HeadersInit {
-  return {
-    'Content-Type': 'application/json',
-    'Accept-Language': locale, // 'es', 'pt', 'en'
-    ...(config.isDevelopment ? { 'x-user-id': '1' } : {}),
-  };
+- [ ] **Español (es.json)**: Crear todas las claves de traducción
+  - [ ] Títulos de página (`feature.title`)
+  - [ ] Botones (`feature.createButton`, `feature.editButton`)
+  - [ ] Labels de formulario (`feature.form.nameLabel`)
+  - [ ] Placeholders (`feature.form.namePlaceholder`)
+  - [ ] Headers de tabla (`feature.table.name`, `feature.table.status`)
+  - [ ] Mensajes de éxito/error (`feature.messages.created`)
+  - [ ] Confirmaciones (`feature.deleteConfirm.title`)
+
+- [ ] **Traducir a otros idiomas**:
+  - [ ] Portugués (pt.json)
+  - [ ] Inglés (en.json)
+  - [ ] Francés (fr.json)
+  - [ ] Chino (zh.json)
+
+- [ ] **Actualizar componentes**:
+  - [ ] Usar `const { t } = useTranslation()` en cada componente
+  - [ ] Reemplazar textos hardcodeados con `t('key')`
+  - [ ] Verificar dot notation correcta
+
+- [ ] **Testing**:
+  - [ ] Probar cambio de idioma en selector
+  - [ ] Verificar que toda la UI se actualiza
+  - [ ] Buscar textos hardcodeados (`grep -r "Crear" src/` para encontrar strings sin traducir)
+  - [ ] Verificar que no hay claves faltantes (aparecerían como `feature.key` en lugar de traducción)
+
+---
+
+### 3.7.10. Ejemplo Completo: Traducir una Página
+
+**Antes** (textos hardcodeados):
+```tsx
+export default function GruposPage() {
+  return (
+    <div>
+      <h1>Grupos Económicos</h1>
+      <Button>Crear Grupo</Button>
+      <Input placeholder="Buscar..." />
+      <TableHead>Nombre</TableHead>
+      <TableHead>País</TableHead>
+    </div>
+  );
 }
 ```
 
-**Backend Validators** (futuro):
-Implementar mensajes de error traducidos en Zod schemas:
-```typescript
-export const CreateGrupoSchema = z.object({
-  nombre: z.string()
-    .min(3, { message: getTranslation('grupos.errors.nombreTooShort') })
-    .max(200, { message: getTranslation('grupos.errors.nombreTooLong') }),
-});
+**Después** (traducido):
+```tsx
+import { useTranslation } from '@/contexts/I18nContext';
+
+export default function GruposPage() {
+  const { t } = useTranslation();
+
+  return (
+    <div>
+      <h1>{t('grupos.title')}</h1>
+      <Button>{t('grupos.createButton')}</Button>
+      <Input placeholder={t('common.search')} />
+      <TableHead>{t('grupos.table.name')}</TableHead>
+      <TableHead>{t('grupos.table.country')}</TableHead>
+    </div>
+  );
+}
 ```
 
----
-
-### 3.7.8. Checklist de i18n por Feature
-
-- [ ] Crear claves de traducción en `messages/es.json`
-- [ ] Traducir a portugués en `messages/pt.json`
-- [ ] Traducir a inglés en `messages/en.json`
-- [ ] Usar `useTranslations()` en componentes
-- [ ] Traducir labels de formulario
-- [ ] Traducir placeholders
-- [ ] Traducir mensajes de éxito/error
-- [ ] Traducir textos de botones
-- [ ] Traducir headers de tabla
-- [ ] Traducir mensajes de confirmación
-- [ ] Probar cambio de idioma en tiempo real
-- [ ] Verificar que no queden textos hardcodeados
+**Archivos JSON** (agregar estas claves en TODOS los idiomas):
+```json
+{
+  "common": {
+    "search": "Buscar" / "Pesquisar" / "Search"
+  },
+  "grupos": {
+    "title": "Grupos Económicos" / "Grupos Econômicos" / "Economic Groups",
+    "createButton": "Crear Grupo" / "Criar Grupo" / "Create Group",
+    "table": {
+      "name": "Nombre" / "Nome" / "Name",
+      "country": "País" / "País" / "Country"
+    }
+  }
+}
+```
 
 ---
 
@@ -2028,5 +2167,5 @@ export const CreateGrupoSchema = z.object({
 ---
 
 **Última actualización**: 2025-11-02
-**Versión**: 1.2 (Agregado: UI/UX Best Practices e i18n)
+**Versión**: 1.3 (Agregado: Sistema de i18n simple basado en Context + Auto-descubrimiento de idiomas)
 
