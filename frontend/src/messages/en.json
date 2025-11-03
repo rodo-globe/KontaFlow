@@ -1,4 +1,7 @@
 {
+  "_locale": {
+    "name": "English"
+  },
   "common": {
     "create": "Create",
     "edit": "Edit",

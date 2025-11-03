@@ -1,0 +1,195 @@
+{
+  "_locale": {
+    "name": "中文"
+  },
+  "common": {
+    "create": "创建",
+    "edit": "编辑",
+    "delete": "删除",
+    "save": "保存",
+    "saving": "保存中...",
+    "cancel": "取消",
+    "confirm": "确认",
+    "search": "搜索",
+    "filter": "筛选",
+    "loading": "加载中...",
+    "noResults": "未找到结果",
+    "error": "错误",
+    "success": "成功",
+    "actions": "操作",
+    "back": "返回",
+    "next": "下一步",
+    "previous": "上一步",
+    "close": "关闭",
+    "view": "查看",
+    "details": "详情",
+    "active": "活跃",
+    "inactive": "停用",
+    "yes": "是",
+    "no": "否",
+    "all": "全部",
+    "select": "选择",
+    "date": "日期",
+    "total": "总计",
+    "status": "状态"
+  },
+  "navigation": {
+    "home": "首页",
+    "grupos": "经济集团",
+    "empresas": "企业",
+    "comprobantes": "凭证",
+    "cuentas": "账户",
+    "reportes": "报表",
+    "dashboard": "仪表板",
+    "settings": "设置",
+    "logout": "退出"
+  },
+  "grupos": {
+    "title": "经济集团",
+    "createButton": "创建集团",
+    "editButton": "编辑集团",
+    "deleteButton": "删除集团",
+    "viewButton": "查看详情",
+    "searchPlaceholder": "搜索集团...",
+    "emptyState": "未创建经济集团",
+    "emptyStateDescription": "开始创建您的第一个经济集团",
+    "noRut": "无RUT",
+    "companyOne": "企业",
+    "companyMany": "企业",
+    "table": {
+      "name": "名称",
+      "country": "国家",
+      "currency": "货币",
+      "companies": "企业",
+      "createdAt": "创建日期",
+      "status": "状态"
+    },
+    "form": {
+      "title": "集团信息",
+      "createDescription": "填写数据以创建新的经济集团",
+      "editDescription": "修改经济集团数据",
+      "nameLabel": "集团名称",
+      "namePlaceholder": "例如：XYZ集团",
+      "nameRequired": "名称为必填项",
+      "nameMinLength": "名称至少需要3个字符",
+      "countryLabel": "主要国家",
+      "countryPlaceholder": "选择一个国家",
+      "countryRequired": "国家为必填项",
+      "currencyLabel": "基础货币",
+      "currencyPlaceholder": "选择一种货币",
+      "currencyRequired": "货币为必填项"
+    },
+    "countries": {
+      "UY": "乌拉圭",
+      "AR": "阿根廷",
+      "BR": "巴西",
+      "CL": "智利",
+      "US": "美国"
+    },
+    "currencies": {
+      "UYU": "乌拉圭比索",
+      "USD": "美元",
+      "ARS": "阿根廷比索",
+      "BRL": "巴西雷亚尔",
+      "CLP": "智利比索"
+    },
+    "messages": {
+      "created": "经济集团创建成功",
+      "updated": "经济集团更新成功",
+      "deleted": "经济集团删除成功",
+      "loadError": "加载集团时出错",
+      "createError": "创建集团时出错",
+      "updateError": "更新集团时出错",
+      "deleteError": "删除集团时出错"
+    },
+    "deleteConfirm": {
+      "title": "删除集团？",
+      "description": "此操作无法撤消。集团将被标记为停用。",
+      "confirmButton": "是的，删除"
+    },
+    "details": {
+      "title": "集团详情",
+      "information": "基本信息",
+      "companies": "企业",
+      "accountingPlan": "会计科目表",
+      "configuration": "配置",
+      "noCompanies": "此集团中没有企业",
+      "createCompanyButton": "创建第一个企业"
+    },
+    "filters": {
+      "all": "全部",
+      "active": "活跃",
+      "inactive": "停用",
+      "byCountry": "按国家"
+    },
+    "stats": {
+      "totalGroups": "总集团数",
+      "activeGroups": "活跃集团",
+      "inactiveGroups": "停用集团",
+      "totalCompanies": "总企业数"
+    }
+  },
+  "empresas": {
+    "title": "企业",
+    "createButton": "创建企业",
+    "editButton": "编辑企业",
+    "deleteButton": "删除企业",
+    "viewButton": "查看详情",
+    "searchPlaceholder": "搜索企业...",
+    "emptyState": "未创建企业",
+    "emptyStateDescription": "开始创建您的第一个企业",
+    "table": {
+      "name": "名称",
+      "rut": "RUT",
+      "grupo": "经济集团",
+      "currency": "货币",
+      "country": "国家",
+      "status": "状态"
+    },
+    "form": {
+      "title": "企业信息",
+      "nameLabel": "企业名称",
+      "namePlaceholder": "例如：Acme Corp",
+      "nameRequired": "名称为必填项",
+      "rutLabel": "RUT",
+      "rutPlaceholder": "例如：211234560019",
+      "rutRequired": "RUT为必填项",
+      "rutInvalid": "RUT无效",
+      "grupoLabel": "经济集团",
+      "grupoPlaceholder": "选择一个集团",
+      "grupoRequired": "集团为必填项",
+      "currencyLabel": "功能货币",
+      "currencyPlaceholder": "选择一种货币",
+      "currencyRequired": "货币为必填项"
+    },
+    "messages": {
+      "created": "企业创建成功",
+      "updated": "企业更新成功",
+      "deleted": "企业删除成功",
+      "loadError": "加载企业时出错",
+      "createError": "创建企业时出错",
+      "updateError": "更新企业时出错",
+      "deleteError": "删除企业时出错"
+    }
+  },
+  "validation": {
+    "required": "此字段为必填项",
+    "minLength": "至少需要{min}个字符",
+    "maxLength": "最多{max}个字符",
+    "email": "必须是有效的电子邮件",
+    "number": "必须是数字",
+    "positive": "必须是正数",
+    "integer": "必须是整数",
+    "min": "最小值为{min}",
+    "max": "最大值为{max}"
+  },
+  "pagination": {
+    "showing": "显示",
+    "of": "共",
+    "results": "条结果",
+    "page": "页",
+    "rowsPerPage": "每页行数",
+    "first": "第一页",
+    "last": "最后一页"
+  }
+}

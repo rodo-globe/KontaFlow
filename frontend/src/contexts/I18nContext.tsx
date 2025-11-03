@@ -1,18 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import esMessages from '@/messages/es.json';
-import ptMessages from '@/messages/pt.json';
-import enMessages from '@/messages/en.json';
-
-type Messages = typeof esMessages;
-type Locale = 'es' | 'pt' | 'en';
-
-const messages: Record<Locale, Messages> = {
-  es: esMessages,
-  pt: ptMessages,
-  en: enMessages,
-};
+import { messages, DEFAULT_LOCALE, AVAILABLE_LOCALES, type Locale } from '@/i18n/locales';
 
 interface I18nContextType {
   locale: Locale;
@@ -23,12 +12,12 @@ interface I18nContextType {
 const I18nContext = createContext<I18nContextType | undefined>(undefined);
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>('es');
+  const [locale, setLocaleState] = useState<Locale>(DEFAULT_LOCALE);
 
   // Cargar idioma guardado en localStorage al montar
   useEffect(() => {
     const savedLocale = localStorage.getItem('locale') as Locale;
-    if (savedLocale && ['es', 'pt', 'en'].includes(savedLocale)) {
+    if (savedLocale && savedLocale in AVAILABLE_LOCALES) {
       setLocaleState(savedLocale);
     }
   }, []);

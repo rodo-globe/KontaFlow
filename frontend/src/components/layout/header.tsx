@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useTranslation } from '@/contexts/I18nContext';
+import { languages, type Locale } from '@/i18n/locales';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -17,12 +18,6 @@ interface HeaderProps {
 
 export function Header({ onMenuClick }: HeaderProps) {
   const { locale, setLocale } = useTranslation();
-
-  const languages = {
-    es: 'Español',
-    pt: 'Português',
-    en: 'English',
-  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white shadow-sm">
@@ -54,7 +49,7 @@ export function Header({ onMenuClick }: HeaderProps) {
         {/* Language selector */}
         <div className="flex items-center gap-2">
           <Languages className="h-4 w-4 text-gray-500" />
-          <Select value={locale} onValueChange={(value) => setLocale(value as 'es' | 'pt' | 'en')}>
+          <Select value={locale} onValueChange={(value) => setLocale(value as Locale)}>
             <SelectTrigger className="w-[140px]">
               <SelectValue />
             </SelectTrigger>
